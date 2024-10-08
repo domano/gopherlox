@@ -59,6 +59,9 @@ func run(source string) {
 		}
 		slog.Info(scanner.Text())
 	}
+	if hadError {
+		os.Exit(65)
+	}
 }
 
 func errMsg(line int, msg string) {
