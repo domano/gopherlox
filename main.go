@@ -8,6 +8,8 @@ import (
 	"strings"
 )
 
+var hadError bool
+
 func main() {
 	if len(os.Args) > 2 {
 		slog.Info("Usage: gopherlox [script]")
@@ -50,11 +52,16 @@ func run(source string) {
 	scanner := bufio.NewScanner(strings.NewReader(source))
 
 	// TODO we can add the lexing step here via a split function in the scanner
-	})
+
 	for {
 		if !scanner.Scan() {
 			break
 		}
 		slog.Info(scanner.Text())
 	}
+}
+
+func errMsg(line int, msg string) {
+	slog.Error("Error at line %d: %s", line, msg)
+	hadError = true
 }
