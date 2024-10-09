@@ -298,6 +298,10 @@ func run(source io.Reader) {
 			if errors.Is(err, ErrUnkownToken) {
 				continue
 			}
+			if errors.Is(err, ErrWhiteSpace) {
+				start++
+				continue
+			}
 			Tokens = append(Tokens, token)
 			start += n
 			if start >= len(lineString) {
@@ -320,6 +324,7 @@ func errMsg(line int, msg string) {
 
 var ErrUnkownToken = errors.New("unknown token")
 var ErrComment = errors.New("comment")
+var ErrWhiteSpace = errors.New("white space")
 
 func scanToken(data []byte, start, end, line int) (Token, int, error) {
 	switch string(data[start:end]) {
@@ -408,6 +413,8 @@ func scanToken(data []byte, start, end, line int) (Token, int, error) {
 		return Token{Type: RETURN, Lexeme: "return", Literal: "return", Line: line}, end - start, nil
 	case "print":
 		return Token{Type: PRINT, Lexeme: "print", Literal: "print", Line: line}, end - start, nil
+	case " ", "\r", "\t":
+		return Token{}, 0, ErrWhiteSpace
 	default:
 		errMsg(line, fmt.Sprintf("Unexpected char '%s'", string(data)))
 		return Token{}, 0, ErrUnkownToken
