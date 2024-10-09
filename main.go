@@ -292,6 +292,9 @@ func run(source io.Reader) {
 				return
 			}
 			token, n, err := scanToken(lineString, start, current+1, line)
+			if errors.Is(err, ErrComment) {
+				break
+			}
 			if errors.Is(err, ErrUnkownToken) {
 				continue
 			}
@@ -316,6 +319,7 @@ func errMsg(line int, msg string) {
 }
 
 var ErrUnkownToken = errors.New("unknown token")
+var ErrComment = errors.New("comment")
 
 func scanToken(data []byte, start, end, line int) (Token, int, error) {
 	switch string(data[start:end]) {
@@ -338,7 +342,13 @@ func scanToken(data []byte, start, end, line int) (Token, int, error) {
 	case ";":
 		return Token{Type: SEMICOLON, Lexeme: ";", Literal: ";", Line: line}, end - start, nil
 	case "/":
+		token, n, err := scanToken(data, start, end+1, line)
+		if !errors.Is(err, ErrUnkownToken) { // could be a comment
+			return token, n, err
+		}
 		return Token{Type: SLASH, Lexeme: "/", Literal: "/", Line: line}, end - start, nil
+	case "//":
+		return Token{}, 0, ErrComment
 	case "*":
 		return Token{Type: STAR, Lexeme: "*", Literal: "*", Line: line}, end - start, nil
 	case "!":
