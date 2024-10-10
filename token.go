@@ -242,5 +242,5 @@ type Token struct {
 var Tokens []Token = make([]Token, 0)
 
 func (t Token) String() string {
-	return fmt.Sprintf("%s %s %s", t.Type.String(), t.Lexeme, t.Literal)
+	return fmt.Sprintf("Type: %s Lexeme: %s Literal: %s Line: %d", t.Type.String(), t.Lexeme, t.Literal, t.Line)
 }

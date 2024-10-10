@@ -38,17 +38,36 @@ func runPrompt() {
 	}
 }
 
+var isReadingLiteral bool
+var currentLiteral []byte
+
 func run(source io.Reader) {
 	scanner := bufio.NewScanner(source)
-	var start, current, line int
+	var start, line int
 	print("> ")
 	for scanner.Scan() {
-		start, current = 0, 0
+		start = 0
 		lineString := scanner.Bytes()
-		for current = range lineString {
+		for current := 0; current < len(lineString); current++ {
 			if current >= len(lineString) {
 				errMsg(line, "Unexpected end of file")
 				return
+			}
+			if isReadingLiteral {
+				advance, err := charsUntilStringEnd(lineString[start:])
+				if errors.Is(err, ErrStringLineBreak) {
+					currentLiteral = append(currentLiteral, lineString[start:]...)
+					break
+				}
+				if err != nil {
+					errMsg(line, err.Error())
+					return
+				}
+				currentLiteral = append(currentLiteral, lineString[start:start+advance-1]...)
+				Tokens = append(Tokens, Token{Type: STRING, Lexeme: fmt.Sprintf("\"%s\"", currentLiteral), Literal: string(currentLiteral), Line: line})
+				start += advance
+				current += advance
+				isReadingLiteral = false
 			}
 			token, n, err := scanToken(lineString, start, current+1, line)
 			if errors.Is(err, ErrComment) {
@@ -59,6 +78,26 @@ func run(source io.Reader) {
 			}
 			if errors.Is(err, ErrWhiteSpace) {
 				start++
+				continue
+			}
+			if errors.Is(err, ErrString) {
+				start++
+				currentLiteral = make([]byte, 0)
+				isReadingLiteral = true
+				advance, err := charsUntilStringEnd(lineString[start:])
+				if errors.Is(err, ErrStringLineBreak) {
+					currentLiteral = append(currentLiteral, lineString[start:]...)
+					break
+				}
+				if err != nil {
+					errMsg(line, err.Error())
+					return
+				}
+				currentLiteral = append(currentLiteral, lineString[start:start+advance-1]...) // dont include the " at the end
+				Tokens = append(Tokens, Token{Type: STRING, Lexeme: fmt.Sprintf("\"%s\"", currentLiteral), Literal: string(currentLiteral), Line: line})
+				start += advance
+				current += advance
+				isReadingLiteral = false
 				continue
 			}
 			Tokens = append(Tokens, token)
@@ -84,6 +123,7 @@ func errMsg(line int, msg string) {
 var ErrUnkownToken = errors.New("unknown token")
 var ErrComment = errors.New("comment")
 var ErrWhiteSpace = errors.New("white space")
+var ErrString = errors.New("string start")
 
 func scanToken(data []byte, start, end, line int) (Token, int, error) {
 	switch string(data[start:end]) {
@@ -116,6 +156,10 @@ func scanToken(data []byte, start, end, line int) (Token, int, error) {
 	case "*":
 		return Token{Type: STAR, Lexeme: "*", Literal: "*", Line: line}, end - start, nil
 	case "!":
+		token, n, err := scanToken(data, start, end+1, line)
+		if !errors.Is(err, ErrUnkownToken) {
+			return token, n, err
+		}
 		return Token{Type: BANG, Lexeme: "!", Literal: "!", Line: line}, end - start, nil
 	case "=":
 		token, n, err := scanToken(data, start, end+1, line)
@@ -123,7 +167,6 @@ func scanToken(data []byte, start, end, line int) (Token, int, error) {
 			return token, n, err
 		}
 		return Token{Type: EQUAL, Lexeme: "=", Literal: "=", Line: line}, end - start, nil
-
 	case "!=":
 		return Token{Type: BANG_EQUAL, Lexeme: "!=", Literal: "!=", Line: line}, end - start, nil
 	case "==":
@@ -172,10 +215,23 @@ func scanToken(data []byte, start, end, line int) (Token, int, error) {
 		return Token{Type: RETURN, Lexeme: "return", Literal: "return", Line: line}, end - start, nil
 	case "print":
 		return Token{Type: PRINT, Lexeme: "print", Literal: "print", Line: line}, end - start, nil
+	case "\"":
+		return Token{}, 0, ErrString
 	case " ", "\r", "\t":
 		return Token{}, 0, ErrWhiteSpace
 	default:
-		errMsg(line, fmt.Sprintf("Unexpected char '%s'", string(data)))
+		//errMsg(line, fmt.Sprintf("Unexpected char '%s'", string(data)))
 		return Token{}, 0, ErrUnkownToken
 	}
+}
+
+var ErrStringLineBreak = errors.New("string line break")
+
+func charsUntilStringEnd(data []byte) (int, error) {
+	for current := range data {
+		if data[current] == '"' {
+			return current + 1, nil
+		}
+	}
+	return 0, ErrStringLineBreak
 }
