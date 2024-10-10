@@ -100,6 +100,19 @@ func run(source io.Reader) {
 				isReadingLiteral = false
 				continue
 			}
+			if errors.Is(err, ErrNumber) {
+				currentLiteral = make([]byte, 0)
+				advance, err := charsUntilNumberEnd(lineString[start:])
+				if err != nil {
+					errMsg(line, err.Error())
+					return
+				}
+				currentLiteral = append(currentLiteral, lineString[start:start+advance]...)
+				Tokens = append(Tokens, Token{Type: NUMBER, Lexeme: string(currentLiteral), Literal: string(currentLiteral), Line: line})
+				start += advance
+				current += advance
+				continue
+			}
 			Tokens = append(Tokens, token)
 			start += n
 			if start >= len(lineString) {
@@ -120,10 +133,13 @@ func errMsg(line int, msg string) {
 	hadError = true
 }
 
-var ErrUnkownToken = errors.New("unknown token")
-var ErrComment = errors.New("comment")
-var ErrWhiteSpace = errors.New("white space")
-var ErrString = errors.New("string start")
+var (
+	ErrUnkownToken = errors.New("unknown token")
+	ErrComment     = errors.New("comment")
+	ErrWhiteSpace  = errors.New("white space")
+	ErrString      = errors.New("string start")
+	ErrNumber      = errors.New("number")
+)
 
 func scanToken(data []byte, start, end, line int) (Token, int, error) {
 	switch string(data[start:end]) {
@@ -217,10 +233,12 @@ func scanToken(data []byte, start, end, line int) (Token, int, error) {
 		return Token{Type: PRINT, Lexeme: "print", Literal: "print", Line: line}, end - start, nil
 	case "\"":
 		return Token{}, 0, ErrString
+	case "0", "1", "2", "3", "4", "5", "6", "7", "8", "9":
+		return Token{}, 0, ErrNumber
 	case " ", "\r", "\t":
 		return Token{}, 0, ErrWhiteSpace
 	default:
-		//errMsg(line, fmt.Sprintf("Unexpected char '%s'", string(data)))
+		errMsg(line, fmt.Sprintf("Unexpected char '%s'", string(data)))
 		return Token{}, 0, ErrUnkownToken
 	}
 }
@@ -234,4 +252,24 @@ func charsUntilStringEnd(data []byte) (int, error) {
 		}
 	}
 	return 0, ErrStringLineBreak
+}
+
+func charsUntilNumberEnd(data []byte) (int, error) {
+	var dot bool
+	for current := range data {
+		if data[current] == '.' {
+			if dot {
+				return current, nil
+			}
+			dot = true
+			continue
+		}
+		if data[current] <= '0' && data[current] >= '9' {
+			return current, nil
+		}
+		if data[current] == ' ' || data[current] == '\t' || data[current] == '\r' {
+			return current, nil
+		}
+	}
+	return len(data), nil
 }
