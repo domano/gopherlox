@@ -25,7 +25,7 @@ func main() {
 func runFile(path string) {
 	var file, err = os.Open(path)
 	if err != nil {
-		slog.Error("Error while running rile: %w", err)
+		slog.Error(fmt.Errorf("error while running file: %w", err).Error())
 		return
 	}
 	run(file)
