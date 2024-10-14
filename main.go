@@ -9,6 +9,10 @@ import (
 	"os"
 )
 
+/*
+TODO:
+- fix multiline string parsing
+*/
 var hadError bool
 
 func main() {
