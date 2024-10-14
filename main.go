@@ -48,8 +48,8 @@ func run(source io.Reader) {
 	for scanner.Scan() {
 		start = 0
 		lineString := scanner.Bytes()
-		for current := 0; current < len(lineString); current++ {
-			if current >= len(lineString) {
+		for current := 1; current <= len(lineString); current++ {
+			if current > len(lineString) {
 				errMsg(line, "Unexpected end of file")
 				return
 			}
@@ -63,13 +63,13 @@ func run(source io.Reader) {
 					errMsg(line, err.Error())
 					return
 				}
-				currentLiteral = append(currentLiteral, lineString[start:start+advance-1]...)
+				currentLiteral = append(currentLiteral, lineString[start:start+advance]...)
 				Tokens = append(Tokens, Token{Type: STRING, Lexeme: fmt.Sprintf("\"%s\"", currentLiteral), Literal: string(currentLiteral), Line: line})
 				start += advance
 				current += advance
 				isReadingLiteral = false
 			}
-			token, n, err := scanToken(lineString, start, current+1, line)
+			token, n, err := scanToken(lineString, start, current, line)
 			if errors.Is(err, ErrComment) {
 				break
 			}
@@ -93,11 +93,24 @@ func run(source io.Reader) {
 					errMsg(line, err.Error())
 					return
 				}
-				currentLiteral = append(currentLiteral, lineString[start:start+advance-1]...) // dont include the " at the end
+				currentLiteral = append(currentLiteral, lineString[start:start+advance]...) // dont include the " at the end
 				Tokens = append(Tokens, Token{Type: STRING, Lexeme: fmt.Sprintf("\"%s\"", currentLiteral), Literal: string(currentLiteral), Line: line})
 				start += advance
-				current += advance
+				current = start
 				isReadingLiteral = false
+				continue
+			}
+			if errors.Is(err, ErrIdentifier) {
+				currentLiteral = make([]byte, 0)
+				advance, err := charsUntilStringEnd(lineString[start:])
+				if err != nil {
+					errMsg(line, err.Error())
+					return
+				}
+				currentLiteral = append(currentLiteral, lineString[start:start+advance]...)
+				Tokens = append(Tokens, identifier(currentLiteral, line))
+				start += advance
+				current = start
 				continue
 			}
 			if errors.Is(err, ErrNumber) {
@@ -110,7 +123,7 @@ func run(source io.Reader) {
 				currentLiteral = append(currentLiteral, lineString[start:start+advance]...)
 				Tokens = append(Tokens, Token{Type: NUMBER, Lexeme: string(currentLiteral), Literal: string(currentLiteral), Line: line})
 				start += advance
-				current += advance
+				current = start
 				continue
 			}
 			Tokens = append(Tokens, token)
@@ -139,10 +152,12 @@ var (
 	ErrWhiteSpace  = errors.New("white space")
 	ErrString      = errors.New("string start")
 	ErrNumber      = errors.New("number")
+	ErrIdentifier  = errors.New("identifier")
 )
 
 func scanToken(data []byte, start, end, line int) (Token, int, error) {
-	switch string(data[start:end]) {
+	var str string = string(data[start:end])
+	switch str {
 	case "(":
 		return Token{Type: LEFT_PAREN, Lexeme: "(", Literal: "(", Line: line}, end - start, nil
 	case ")":
@@ -203,34 +218,6 @@ func scanToken(data []byte, start, end, line int) (Token, int, error) {
 		return Token{Type: LESS, Lexeme: "<", Literal: "<", Line: line}, end - start, nil
 	case "<=":
 		return Token{Type: LESS_EQUAL, Lexeme: "<=", Literal: "<=", Line: line}, end - start, nil
-	case "var":
-		return Token{Type: VAR, Lexeme: "var", Literal: "var", Line: line}, end - start, nil
-	case "class":
-		return Token{Type: CLASS, Lexeme: "class", Literal: "class", Line: line}, end - start, nil
-	case "super":
-		return Token{Type: SUPER, Lexeme: "super", Literal: "super", Line: line}, end - start, nil
-	case "this":
-		return Token{Type: THIS, Lexeme: "this", Literal: "this", Line: line}, end - start, nil
-	case "true":
-		return Token{Type: TRUE, Lexeme: "true", Literal: "true", Line: line}, end - start, nil
-	case "false":
-		return Token{Type: FALSE, Lexeme: "false", Literal: "false", Line: line}, end - start, nil
-	case "nil":
-		return Token{Type: NIL, Lexeme: "nil", Literal: "nil", Line: line}, end - start, nil
-	case "if":
-		return Token{Type: IF, Lexeme: "if", Literal: "if", Line: line}, end - start, nil
-	case "else":
-		return Token{Type: ELSE, Lexeme: "else", Literal: "else", Line: line}, end - start, nil
-	case "while":
-		return Token{Type: WHILE, Lexeme: "while", Literal: "while", Line: line}, end - start, nil
-	case "for":
-		return Token{Type: FOR, Lexeme: "for", Literal: "for", Line: line}, end - start, nil
-	case "fun":
-		return Token{Type: FUN, Lexeme: "fun", Literal: "fun", Line: line}, end - start, nil
-	case "return":
-		return Token{Type: RETURN, Lexeme: "return", Literal: "return", Line: line}, end - start, nil
-	case "print":
-		return Token{Type: PRINT, Lexeme: "print", Literal: "print", Line: line}, end - start, nil
 	case "\"":
 		return Token{}, 0, ErrString
 	case "0", "1", "2", "3", "4", "5", "6", "7", "8", "9":
@@ -238,17 +225,66 @@ func scanToken(data []byte, start, end, line int) (Token, int, error) {
 	case " ", "\r", "\t":
 		return Token{}, 0, ErrWhiteSpace
 	default:
+		if isAlpha(data[start]) {
+			return Token{}, 0, ErrIdentifier
+		}
 		errMsg(line, fmt.Sprintf("Unexpected char '%s'", string(data)))
 		return Token{}, 0, ErrUnkownToken
 	}
+}
+
+func identifier(data []byte, line int) Token {
+	switch string(data) {
+	case "var":
+		return Token{Type: VAR, Lexeme: "var", Literal: "var", Line: line}
+	case "class":
+		return Token{Type: CLASS, Lexeme: "class", Literal: "class", Line: line}
+	case "super":
+		return Token{Type: SUPER, Lexeme: "super", Literal: "super", Line: line}
+	case "this":
+		return Token{Type: THIS, Lexeme: "this", Literal: "this", Line: line}
+	case "true":
+		return Token{Type: TRUE, Lexeme: "true", Literal: "true", Line: line}
+	case "false":
+		return Token{Type: FALSE, Lexeme: "false", Literal: "false", Line: line}
+	case "nil":
+		return Token{Type: NIL, Lexeme: "nil", Literal: "nil", Line: line}
+	case "if":
+		return Token{Type: IF, Lexeme: "if", Literal: "if", Line: line}
+	case "else":
+		return Token{Type: ELSE, Lexeme: "else", Literal: "else", Line: line}
+	case "while":
+		return Token{Type: WHILE, Lexeme: "while", Literal: "while", Line: line}
+	case "for":
+		return Token{Type: FOR, Lexeme: "for", Literal: "for", Line: line}
+	case "fun":
+		return Token{Type: FUN, Lexeme: "fun", Literal: "fun", Line: line}
+	case "return":
+		return Token{Type: RETURN, Lexeme: "return", Literal: "return", Line: line}
+	case "print":
+		return Token{Type: PRINT, Lexeme: "print", Literal: "print", Line: line}
+	default:
+		return Token{Type: IDENTIFIER, Lexeme: string(data), Literal: string(data), Line: line}
+	}
+}
+
+func isAlphaNumeric(data byte) bool {
+	return (data >= 'a' && data <= 'z') || (data >= 'A' && data <= 'Z') || (data >= '0' && data <= '9') || data == '_'
+}
+func isAlpha(data byte) bool {
+	return (data >= 'a' && data <= 'z') || (data >= 'A' && data <= 'Z') || data == '_'
+}
+
+func isDigit(data byte) bool {
+	return data >= '0' && data <= '9'
 }
 
 var ErrStringLineBreak = errors.New("string line break")
 
 func charsUntilStringEnd(data []byte) (int, error) {
 	for current := range data {
-		if data[current] == '"' {
-			return current + 1, nil
+		if !isAlphaNumeric(data[current]) {
+			return current, nil
 		}
 	}
 	return 0, ErrStringLineBreak
@@ -264,10 +300,7 @@ func charsUntilNumberEnd(data []byte) (int, error) {
 			dot = true
 			continue
 		}
-		if data[current] <= '0' && data[current] >= '9' {
-			return current, nil
-		}
-		if data[current] == ' ' || data[current] == '\t' || data[current] == '\r' {
+		if !isDigit(data[current]) {
 			return current, nil
 		}
 	}
