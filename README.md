@@ -1,23 +1,24 @@
 # gopherlox
 ![image](https://github.com/user-attachments/assets/f3576184-a90a-4bca-a1d8-4632e27fcc8f)
-A go implementation of the lox programming language
+A goation of the lox programming language
 
 ## TODOs
 ### Lexer
-- [x] implement all token types
-- [x] implement all keywords
-- [x] implement all operators
-- [x] implement all literals
-- [x] implement identifiers
-- [x] implement numbers (floating point)
-- [x] implement strings
-- [x] implement comments
+- [x] all token types
+- [x] all keywords
+- [x] all operators
+- [x] all literals
+- [x] identifiers
+- [x] numbers (floating point)
+- [x] strings
+- [x] comments
 - [x] skip whitespaces
-- [ ] implement multi line comments using /* */
+- [ ] multi line comments using /* */
 - [ ] fix multiline string parsing
+- [ ] property based testing
 
 ### Parser
-- [ ] implement the following grammar
+- [ ] basic grammar
 ```
 expression → literal
 | unary
