@@ -23,9 +23,9 @@ expression → literal
 | unary
 | binary
 | grouping ;
-literal grouping unary binary operator → NUMBER | STRING | "true" | "false" | "nil" ;
-→ "(" expression ")" ;
-→ ( "-" | "!" ) expression ;
-→ expression operator expression ;
-→ "==" | "!=" | "<" | "<=" | 
+literal → NUMBER | STRING | "true" | "false" | "nil" ;
+grouping → "(" expression ")" ;
+unary → ( "-" | "!" ) expression ;
+binary → expression operator expression ;
+operator → "==" | "!=" | "<" | "<=" | 
 ```
