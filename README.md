@@ -16,7 +16,7 @@ A goation of the lox programming language
 - [ ] multi line comments using /* */
 - [ ] fix multiline string parsing
 - [ ] property based testing
-
+- [ ] fuzz lexer, great to train that muscle
 ### Parser
 - [ ] basic grammar
 ```
